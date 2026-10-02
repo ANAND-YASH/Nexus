@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "NEXUS shared library (compiled with tsc)",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "verbatimModuleSyntax": true
+  }
+}

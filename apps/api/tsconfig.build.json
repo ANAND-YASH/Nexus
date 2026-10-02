@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "types": ["node"],
+    // Keep the incremental cache inside dist/ so cleaning dist also resets it.
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "test", "dist", "**/*.spec.ts"]
+}
