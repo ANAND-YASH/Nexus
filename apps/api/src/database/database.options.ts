@@ -1,0 +1,46 @@
+import { extname, join } from 'node:path';
+import type { DataSourceOptions } from 'typeorm';
+import type { Env } from '../config/env';
+import { User } from '../users/user.entity';
+
+export type DatabaseEnv = Pick<
+  Env,
+  | 'DATABASE_HOST'
+  | 'DATABASE_PORT'
+  | 'DATABASE_USER'
+  | 'DATABASE_PASSWORD'
+  | 'DATABASE_NAME'
+>;
+
+/** Every entity the application maps. Register new entities here. */
+export const entities = [User];
+
+/**
+ * Single source of truth for the database connection, shared by the Nest
+ * runtime (DatabaseModule) and the TypeORM CLI (data-source.ts).
+ */
+export function buildDataSourceOptions(env: DatabaseEnv): DataSourceOptions {
+  return {
+    type: 'postgres',
+    host: env.DATABASE_HOST,
+    port: env.DATABASE_PORT,
+    username: env.DATABASE_USER,
+    password: env.DATABASE_PASSWORD,
+    database: env.DATABASE_NAME,
+    applicationName: 'nexus-api',
+    entities,
+    // .ts under ts-node (CLI), .js in the compiled build (where a *.ts glob
+    // would also match emitted .d.ts files).
+    migrations: [join(__dirname, 'migrations', `*${extname(__filename)}`)],
+    migrationsTableName: 'typeorm_migrations',
+    migrationsTransactionMode: 'each',
+    // Schema changes go through migrations only.
+    synchronize: false,
+    migrationsRun: false,
+    // gen_random_uuid() is built into PostgreSQL 13+; never CREATE EXTENSION
+    // implicitly at connect time (needs superuser in managed databases).
+    uuidExtension: 'pgcrypto',
+    installExtensions: false,
+    connectTimeoutMS: 5_000,
+  };
+}

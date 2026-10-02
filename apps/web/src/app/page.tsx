@@ -11,13 +11,13 @@ export default async function HomePage() {
       </p>
       <p className="text-sm">
         API status:{' '}
-        <span
-          className={
-            health?.status === 'ok' ? 'text-green-600' : 'text-red-600'
-          }
-        >
-          {health?.status === 'ok' ? 'online' : 'unreachable'}
-        </span>
+        {!health ? (
+          <span className="text-red-600">unreachable</span>
+        ) : health.checks.database.status === 'up' ? (
+          <span className="text-green-600">online</span>
+        ) : (
+          <span className="text-amber-600">online (database down)</span>
+        )}
       </p>
     </main>
   );
