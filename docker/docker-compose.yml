@@ -1,5 +1,6 @@
 # Local infrastructure for NEXUS development.
 # Run from the repo root: `pnpm docker:up` (reads ./.env for overrides).
+# Postgres is initialised from the same DATABASE_* variables the API uses.
 name: nexus
 
 services:
@@ -7,11 +8,11 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-nexus}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexus_dev_password}
-      POSTGRES_DB: ${POSTGRES_DB:-nexus}
+      POSTGRES_USER: ${DATABASE_USER:-nexus}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD must be set in .env}
+      POSTGRES_DB: ${DATABASE_NAME:-nexus}
     ports:
-      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+      - '127.0.0.1:${DATABASE_PORT:-5432}:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
