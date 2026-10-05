@@ -193,9 +193,11 @@ describe('Document analysis (e2e)', () => {
       .post(`/api/documents/${documentId}/analyze`)
       .expect(202);
     const queued = accepted.body as DocumentAnalysisResponse;
+    // The in-process worker may already have claimed the job by the time
+    // the response is built, so either in-flight status is correct.
+    expect(['PENDING', 'PROCESSING']).toContain(queued.status);
     expect(queued).toMatchObject({
       documentId,
-      status: 'PENDING',
       model: 'test-model',
       summary: null,
     });
@@ -291,11 +293,9 @@ describe('Document analysis (e2e)', () => {
     const again = (
       await as(alice).post(`/api/documents/${documentId}/analyze`).expect(202)
     ).body as DocumentAnalysisResponse;
-    expect(again).toMatchObject({
-      id: first.id,
-      status: 'PENDING',
-      summary: null,
-    });
+    // In flight again (PENDING or already PROCESSING), previous results cleared.
+    expect(['PENDING', 'PROCESSING']).toContain(again.status);
+    expect(again).toMatchObject({ id: first.id, summary: null });
 
     const second = await settled(alice, documentId);
     expect(second).toMatchObject({ id: first.id, summary: 'Updated summary.' });

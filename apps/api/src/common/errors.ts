@@ -1,6 +1,7 @@
 import { QueryFailedError } from 'typeorm';
 
 const FOREIGN_KEY_VIOLATION = '23503';
+const UNIQUE_VIOLATION = '23505';
 /** e.g. a document whose text search vector would exceed 1 MB. */
 export const PROGRAM_LIMIT_EXCEEDED = '54000';
 
@@ -22,6 +23,18 @@ export function isForeignKeyViolation(
   };
   return (
     driverError.code === FOREIGN_KEY_VIOLATION &&
+    driverError.constraint === constraint
+  );
+}
+
+export function isUniqueViolation(error: unknown, constraint: string): boolean {
+  if (!(error instanceof QueryFailedError)) return false;
+  const driverError = error.driverError as {
+    code?: string;
+    constraint?: string;
+  };
+  return (
+    driverError.code === UNIQUE_VIOLATION &&
     driverError.constraint === constraint
   );
 }

@@ -26,5 +26,7 @@ import { DocumentTaskLink } from './links/document-task-link.entity';
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService, DocumentLinksService, DocumentLinksStore],
+  // ContextModule uses assertOwned() for graph endpoints and provenance.
+  exports: [DocumentsService],
 })
 export class DocumentsModule {}

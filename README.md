@@ -4,12 +4,12 @@
 goals, documents, calendar, email, GitHub activity and other sources into a
 unified context layer, then helps turn that information into action.
 
-> **Status: Phase 6 — AI document intelligence.** Monorepo, apps, shared
-> packages, local infrastructure, a migration-based PostgreSQL layer (TypeORM),
-> email/password authentication (JWT access tokens + rotating refresh tokens),
-> the core per-user domain model (projects, tasks, goals), a document
-> knowledge layer with relationships and full-text search, and asynchronous
-> AI analysis of documents (OpenAI structured output via a BullMQ worker).
+> **Status: Phase 7 — context graph.** Monorepo, apps, shared packages,
+> local infrastructure, a migration-based PostgreSQL layer (TypeORM),
+> email/password authentication, projects/tasks/goals, a document knowledge
+> layer with full-text search, asynchronous AI document analysis, and a
+> per-user context graph (entities, typed relationships with provenance,
+> depth-1 context, AI relationship candidates).
 > No embeddings, RAG, chat, integrations or UI for these yet.
 
 ## Stack
@@ -173,6 +173,7 @@ apps/api/src/
   projects/ tasks/ goals/ Domain modules (entity, DTOs, service, controller)
   documents/              Documents, links to projects/tasks/goals, search
   ai/                     AI provider abstraction (OpenAI) + document analysis
+  context/                Context graph: entities, relationships, context, candidates
 ```
 
 ## Authentication
@@ -520,6 +521,135 @@ a short user-facing message — never a provider error.
 - **Deletion.** Deleting a document deletes its analysis.
 - Swapping providers means binding `DOCUMENT_ANALYZER` to another
   implementation in `ai/ai.module.ts`; nothing else depends on OpenAI.
+
+## Context graph
+
+A per-user graph connecting documents, projects, tasks, goals and **context
+entities** through typed, attributed **relationships**. It is the substrate
+later phases (AI reasoning, recommendations) will query. After pulling this
+phase run `pnpm db:migration:run`; no new environment variables are needed.
+
+### Entities
+
+Named things in a user's world: `PERSON`, `ORGANIZATION`, `PROJECT`,
+`TECHNOLOGY`, `LOCATION`, `CONCEPT`. Names are de-duplicated per owner and
+type by a normalized form (Unicode NFKC, trimmed, whitespace collapsed,
+lowercased): "ACME Corp" and "acme corp" are the same organization; "Acme"
+the organization and "Acme" the project are not.
+
+### Relationships and provenance
+
+`source —relationshipType→ target`, where both ends are one of `DOCUMENT`,
+`PROJECT`, `TASK`, `GOAL`, `ENTITY`, and the type is one of `RELATED_TO`,
+`MENTIONS`, `SUPPORTS`, `DEPENDS_ON`, `BLOCKS`, `PART_OF`, `ASSIGNED_TO`,
+`CREATED_BY`, `USES`. Every relationship records **who asserted it**:
+
+| `source` | Meaning                   | Confidence | `sourceDocumentId` |
+| -------- | ------------------------- | ---------- | ------------------ |
+| `USER`   | Created through the API   | always 1   | optional           |
+| `AI`     | Accepted AI candidate     | 0–1        | **required**       |
+| `SYSTEM` | Reserved for internal use | 0–1        | optional           |
+| `IMPORT` | Reserved for integrations | 0–1        | optional           |
+
+Validation rules (also enforced by CHECK constraints): confidence in 0–1;
+USER ⇒ 1; AI ⇒ source document; **no self-relationships** (a resource can't
+relate to itself; two different resources of the same type can).
+`MENTIONS` must start at a document; `ASSIGNED_TO`/`CREATED_BY` must point at
+an entity. A relationship is unique per (owner, source, type, target) — a
+database constraint, so concurrent duplicates still produce one row (409).
+Deleting the source document deletes the relationships it justified.
+
+### Owner isolation
+
+Every query is scoped to the authenticated user; `ownerId` is never accepted
+from clients. Both endpoints (and the source document) must be the caller's —
+otherwise the response is the same 404 as for a missing resource, so other
+users' resources are never revealed, counted or resolved.
+
+**Polymorphic references.** `source_id`/`target_id` point into five tables,
+so PostgreSQL can't enforce them with a foreign key. Instead: (1) creating a
+relationship locks both endpoints (owner-scoped `SELECT … FOR KEY SHARE`) in
+the same transaction as the insert, so they must exist and be the owner's,
+and a concurrent delete waits; (2) an `AFTER DELETE` trigger on each resource
+table deletes that resource's relationships. Together, no relationship can
+reference a missing or foreign resource.
+
+### API
+
+All endpoints require `Authorization: Bearer <access token>`.
+
+| Method & path                                            | Notes                                                                                                                 |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/context/entities`                             | `{ name, type, description?, metadata? }` → 201; 409 if name+type exists                                              |
+| `GET /api/context/entities?type=&search=`                | Summaries (no description/metadata); `search` = case-insensitive substring                                            |
+| `GET`/`PATCH`/`DELETE /api/context/entities/:id`         | PATCH: omitted = unchanged, `null` clears description/metadata                                                        |
+| `POST /api/context/relationships`                        | `{ sourceType, sourceId, relationshipType, targetType, targetId, sourceDocumentId?, metadata? }` → 201, always `USER` |
+| `GET /api/context/relationships`                         | Filters: `sourceType`, `sourceId`, `targetType`, `targetId`, `relationshipType`, `source`                             |
+| `DELETE /api/context/relationships/:id`                  | 204                                                                                                                   |
+| `GET /api/context/{documents,projects,tasks,goals}/:id`  | Depth-1 context (below)                                                                                               |
+| `GET /api/context/entities/:id/context`                  | Depth-1 context of an entity (`/context/entities/:id` is the entity itself)                                           |
+| `GET /api/context/documents/:id/candidates`              | AI relationship candidates (not stored)                                                                               |
+| `POST /api/context/documents/:id/candidates/:key/accept` | Store one candidate as an `AI` relationship → 201; 409 if it exists                                                   |
+
+`metadata` is a JSON object of at most 4 KB.
+
+### Context (depth 1)
+
+```json
+{
+  "resource": { "resourceType": "PROJECT", "id": "…", "name": "Launch", "status": "ACTIVE", … },
+  "related": {
+    "documents": [], "projects": [], "tasks": [], "goals": [], "entities": [],
+    "relationships": [ { "sourceType": "PROJECT", "relationshipType": "USES", "targetType": "ENTITY", … } ]
+  },
+  "truncated": false
+}
+```
+
+Neighbours are everything one hop away: through graph relationships (either
+direction) and through built-in links (document ↔ project/task/goal links,
+task → project, a project's tasks). Nodes carry metadata only — never
+document content. Each list is capped (100 neighbours per type, 200
+relationships; `truncated: true` if a cap was hit).
+
+**Why depth 1.** A fixed, small number of queries per request (resource,
+edges, built-in links, then one batched load per resource type — no N+1),
+bounded response size and deterministic ordering. Unbounded traversal over a
+densely linked personal graph gets expensive and noisy fast; deeper or
+weighted traversal can be added deliberately when a use case needs it.
+
+### AI candidates vs. stored relationships
+
+AI-generated relationships are never the source of truth:
+
+```
+AI analysis (Phase 6) → candidates (derived on request, never stored)
+  → user accepts one → server re-derives + validates it → stored with source AI
+```
+
+- Candidates come from a document's **completed** analysis: each extracted
+  entity becomes `DOCUMENT —MENTIONS→ entity` with confidence 0.8. Free-form
+  entity types are mapped conservatively (unknown types are skipped). No new
+  AI call is made and the Phase 6 schema is unchanged.
+- AI output never supplies ids — only names and types, resolved owner-scoped
+  (an entity is created on acceptance if needed). A UUID in AI output is just
+  a name.
+- Accepting takes only the candidate `key`; the server regenerates the
+  candidate, so clients can't inject confidence, provenance or references.
+- Any AI proposal goes through one validation gate: strict shape validation
+  (unknown fields, enums, ranges, ids), owner-scoped resolution of every
+  reference and of the source document, then the normal relationship rules.
+  Accepted relationships keep `source: AI` — they are never relabelled `USER`.
+
+### Why PostgreSQL rather than a graph database
+
+The graph is small per user, always queried within one owner, and only one
+hop deep — well served by indexed relational tables (owner-leading indexes on
+both edge directions). Keeping it in PostgreSQL gives transactional writes
+alongside the resources it references, the same constraints/backup/migration
+tooling as the rest of NEXUS, and one less system to operate. A dedicated
+graph store (e.g. Neo4j) becomes worth it if multi-hop traversal, path
+queries or graph algorithms turn into core features.
 
 ## Shared packages
 

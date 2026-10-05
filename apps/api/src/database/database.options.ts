@@ -3,6 +3,8 @@ import type { DataSourceOptions } from 'typeorm';
 import { DocumentAnalysis } from '../ai/document-analysis/document-analysis.entity';
 import { RefreshSession } from '../auth/sessions/refresh-session.entity';
 import type { DatabaseEnv } from '../config/env';
+import { ContextEntity } from '../context/entities/context-entity.entity';
+import { ContextRelationship } from '../context/relationships/context-relationship.entity';
 import { Document } from '../documents/document.entity';
 import { DocumentGoalLink } from '../documents/links/document-goal-link.entity';
 import { DocumentProjectLink } from '../documents/links/document-project-link.entity';
@@ -24,6 +26,8 @@ export const entities = [
   DocumentTaskLink,
   DocumentGoalLink,
   DocumentAnalysis,
+  ContextEntity,
+  ContextRelationship,
 ];
 
 /**

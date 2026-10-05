@@ -1,5 +1,9 @@
 import { Transform } from 'class-transformer';
-import { ValidateIf } from 'class-validator';
+import {
+  ValidateIf,
+  ValidateBy,
+  type ValidationOptions,
+} from 'class-validator';
 
 /**
  * Optional for PATCH, but not nullable: skips validation only when the field
@@ -29,3 +33,30 @@ export function definedOnly<T extends object>(dto: T): Partial<T> {
     Object.entries(dto).filter(([, value]) => value !== undefined),
   ) as Partial<T>;
 }
+
+/** Upper bound for free-form JSON metadata stored with a record. */
+export const METADATA_MAX_BYTES = 4_096;
+
+/**
+ * A plain JSON object (not an array or primitive) whose serialized size is at
+ * most `maxBytes`. Used for free-form `metadata` fields.
+ */
+export const IsBoundedJsonObject = (
+  maxBytes = METADATA_MAX_BYTES,
+  options?: ValidationOptions,
+) =>
+  ValidateBy(
+    {
+      name: 'isBoundedJsonObject',
+      validator: {
+        validate: (value: unknown) =>
+          typeof value === 'object' &&
+          value !== null &&
+          !Array.isArray(value) &&
+          Buffer.byteLength(JSON.stringify(value), 'utf8') <= maxBytes,
+        defaultMessage: (args) =>
+          `${args?.property ?? 'value'} must be a JSON object of at most ${maxBytes} bytes`,
+      },
+    },
+    options,
+  );
