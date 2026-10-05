@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { DocumentAnalysisModule } from './ai/document-analysis/document-analysis.module';
 import { AuthModule } from './auth/auth.module';
 import { validateEnv } from './config/env';
 import { DatabaseModule } from './database/database.module';
@@ -25,6 +26,7 @@ import { TasksModule } from './tasks/tasks.module';
     TasksModule,
     GoalsModule,
     DocumentsModule,
+    DocumentAnalysisModule,
   ],
 })
 export class AppModule {}

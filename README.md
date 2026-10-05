@@ -4,12 +4,13 @@
 goals, documents, calendar, email, GitHub activity and other sources into a
 unified context layer, then helps turn that information into action.
 
-> **Status: Phase 5 — documents & knowledge.** Monorepo, apps, shared
+> **Status: Phase 6 — AI document intelligence.** Monorepo, apps, shared
 > packages, local infrastructure, a migration-based PostgreSQL layer (TypeORM),
 > email/password authentication (JWT access tokens + rotating refresh tokens),
-> the core per-user domain model (projects, tasks, goals), and a document
-> knowledge layer with relationships and PostgreSQL full-text search.
-> No AI, embeddings, integrations or UI for these yet.
+> the core per-user domain model (projects, tasks, goals), a document
+> knowledge layer with relationships and full-text search, and asynchronous
+> AI analysis of documents (OpenAI structured output via a BullMQ worker).
+> No embeddings, RAG, chat, integrations or UI for these yet.
 
 ## Stack
 
@@ -171,6 +172,7 @@ apps/api/src/
   auth/sessions/          RefreshSession entity (hashed refresh tokens)
   projects/ tasks/ goals/ Domain modules (entity, DTOs, service, controller)
   documents/              Documents, links to projects/tasks/goals, search
+  ai/                     AI provider abstraction (OpenAI) + document analysis
 ```
 
 ## Authentication
@@ -429,6 +431,95 @@ curl -s "$API/documents/<doc id>" -H "$AUTH"
 
 curl -s "$API/documents?search=refresh%20tokens" -H "$AUTH"
 ```
+
+## AI document analysis
+
+Asynchronous, structured analysis of a document's title and content: a
+summary, key points, topics, entities, suggested action items and important
+dates. Results are **insight only** — NEXUS never creates tasks or performs
+any other action from them.
+
+```
+POST /analyze → document_ai_analysis row (PENDING) → BullMQ "document-analysis"
+  → worker (in the API process) → OpenAI structured output → validated → COMPLETED / FAILED
+```
+
+### Enable it
+
+It is off by default (no Redis connection, no AI provider; `POST …/analyze`
+returns 503). To enable:
+
+```bash
+# .env
+AI_DOCUMENT_ANALYSIS_ENABLED=true
+OPENAI_API_KEY=sk-…                     # never commit
+AI_DOCUMENT_ANALYSIS_MODEL=gpt-4o-mini  # any Responses-API model with structured outputs
+REDIS_URL=redis://localhost:6379        # match REDIS_PORT if you changed it
+
+pnpm docker:up && pnpm db:migration:run && pnpm dev:api
+```
+
+When enabled, the API refuses to start if `OPENAI_API_KEY` or `REDIS_URL` is
+missing, or if the key doesn't look like an OpenAI key (`sk-…`). Neither
+value is ever logged or echoed.
+
+### Endpoints
+
+Both require `Authorization: Bearer <access token>` and are owner-scoped
+(another user's document is the same 404 as a missing one).
+
+| Method & path                     | Success                                                           | Errors                                             |
+| --------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------- |
+| `POST /api/documents/:id/analyze` | **202** analysis (status `PENDING`, or the run already in flight) | 404 document, 503 disabled or queue unavailable    |
+| `GET /api/documents/:id/analysis` | **200** current analysis                                          | 404 document, or `Document has not been analyzed.` |
+
+```json
+{
+  "id": "…",
+  "documentId": "…",
+  "status": "COMPLETED",
+  "model": "gpt-4o-mini",
+  "summary": "…",
+  "keyPoints": ["…"],
+  "topics": ["…"],
+  "entities": [{ "name": "Acme", "type": "organization" }],
+  "actionItems": [{ "title": "Book venue", "priority": "HIGH" }],
+  "importantDates": [{ "date": "2027-03-01", "description": "Launch" }],
+  "error": null,
+  "createdAt": "…",
+  "updatedAt": "…"
+}
+```
+
+`status` is `PENDING` → `PROCESSING` → `COMPLETED` or `FAILED`; poll the GET
+endpoint. Result fields are `null` until `COMPLETED`. On `FAILED`, `error` is
+a short user-facing message — never a provider error.
+
+### Behavior
+
+- **One analysis per document.** Re-analysis resets the same record (results
+  are cleared until the new run completes). Requesting analysis while a run
+  is pending/processing (and updated within the last 10 minutes) returns that
+  run instead of starting — and paying for — another.
+- **Idempotent jobs.** Each request starts a new run id; the worker only writes
+  while its run is current, so duplicate deliveries, retries and superseded
+  jobs can't corrupt the record. Concurrent requests can't create a second row
+  (unique `(document_id, owner_id)`, upsert).
+- **Retries.** 3 attempts with exponential backoff (10 s, 20 s) for rate
+  limits, outages and invalid model output; no retry for rejected requests
+  (bad key, unknown model, document too long, refusals). Completed jobs are
+  kept in Redis for 24 h, failed ones for 7 days.
+- **Structured output.** OpenAI strict JSON-schema mode, then validated again
+  in the API (types, enums, lengths, real `YYYY-MM-DD` dates) before storing.
+  Requests use `store: false`.
+- **Prompt-injection hardening.** The document is passed as untrusted data
+  inside per-request random delimiters; the instructions forbid following any
+  instructions in it. The model has no tools, and its output is only stored.
+- **Privacy.** Only title and content are sent. Logs contain document/analysis
+  ids and statuses only — never content, prompts, model output or the key.
+- **Deletion.** Deleting a document deletes its analysis.
+- Swapping providers means binding `DOCUMENT_ANALYZER` to another
+  implementation in `ai/ai.module.ts`; nothing else depends on OpenAI.
 
 ## Shared packages
 

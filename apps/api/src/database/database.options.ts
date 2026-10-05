@@ -1,5 +1,6 @@
 import { extname, join } from 'node:path';
 import type { DataSourceOptions } from 'typeorm';
+import { DocumentAnalysis } from '../ai/document-analysis/document-analysis.entity';
 import { RefreshSession } from '../auth/sessions/refresh-session.entity';
 import type { DatabaseEnv } from '../config/env';
 import { Document } from '../documents/document.entity';
@@ -22,6 +23,7 @@ export const entities = [
   DocumentProjectLink,
   DocumentTaskLink,
   DocumentGoalLink,
+  DocumentAnalysis,
 ];
 
 /**

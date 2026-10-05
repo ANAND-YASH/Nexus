@@ -32,6 +32,10 @@ describe('validateEnv', () => {
       JWT_ACCESS_EXPIRES_IN: 900,
       JWT_REFRESH_SECRET: 'r'.repeat(32),
       JWT_REFRESH_EXPIRES_IN: 604_800,
+      AI_DOCUMENT_ANALYSIS_ENABLED: false,
+      OPENAI_API_KEY: null,
+      AI_DOCUMENT_ANALYSIS_MODEL: 'gpt-4o-mini',
+      REDIS_URL: null,
     });
   });
 
@@ -114,4 +118,61 @@ describe('parseDuration', () => {
       expect(() => parseDuration('X', input)).toThrow(/Invalid X/);
     },
   );
+});
+
+describe('validateEnv (AI document analysis)', () => {
+  const ai = {
+    AI_DOCUMENT_ANALYSIS_ENABLED: 'true',
+    OPENAI_API_KEY: 'sk-test-0123456789',
+    AI_DOCUMENT_ANALYSIS_MODEL: 'gpt-4o-mini',
+    REDIS_URL: 'redis://localhost:6380',
+  };
+
+  it('is disabled by default and needs no key or Redis', () => {
+    expect(validateEnv(valid)).toMatchObject({
+      AI_DOCUMENT_ANALYSIS_ENABLED: false,
+    });
+  });
+
+  it('parses an enabled configuration', () => {
+    expect(validateEnv({ ...valid, ...ai })).toMatchObject({
+      AI_DOCUMENT_ANALYSIS_ENABLED: true,
+      OPENAI_API_KEY: 'sk-test-0123456789',
+      AI_DOCUMENT_ANALYSIS_MODEL: 'gpt-4o-mini',
+      REDIS_URL: 'redis://localhost:6380',
+    });
+  });
+
+  it('fails clearly when enabled without OPENAI_API_KEY or REDIS_URL', () => {
+    expect(() =>
+      validateEnv({ ...valid, ...ai, OPENAI_API_KEY: '', REDIS_URL: '' }),
+    ).toThrow(
+      'AI_DOCUMENT_ANALYSIS_ENABLED is true but OPENAI_API_KEY, REDIS_URL are not set.',
+    );
+  });
+
+  it('rejects a placeholder key without echoing it', () => {
+    const placeholder = 'YOUR_OPENAI_API_KEY_HERE';
+    let message = '';
+    try {
+      validateEnv({ ...valid, ...ai, OPENAI_API_KEY: placeholder });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toMatch(/does not look like an OpenAI API key/);
+    expect(message).not.toContain(placeholder);
+  });
+
+  it('rejects an invalid flag, model name or Redis URL (without echoing it)', () => {
+    expect(() =>
+      validateEnv({ ...valid, AI_DOCUMENT_ANALYSIS_ENABLED: 'yes' }),
+    ).toThrow(/AI_DOCUMENT_ANALYSIS_ENABLED/);
+    expect(() =>
+      validateEnv({ ...valid, AI_DOCUMENT_ANALYSIS_MODEL: 'gpt 4o; rm -rf' }),
+    ).toThrow(/AI_DOCUMENT_ANALYSIS_MODEL/);
+    const secretUrl = 'http://user:hunter2@cache:6379';
+    expect(() => validateEnv({ ...valid, REDIS_URL: secretUrl })).toThrow(
+      'REDIS_URL must be a redis:// or rediss:// URL.',
+    );
+  });
 });
