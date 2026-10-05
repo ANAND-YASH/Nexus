@@ -4,10 +4,11 @@
 goals, documents, calendar, email, GitHub activity and other sources into a
 unified context layer, then helps turn that information into action.
 
-> **Status: Phase 3 — authentication.** Monorepo, apps, shared packages,
-> local infrastructure, a migration-based PostgreSQL layer (TypeORM), and
-> email/password authentication (JWT access tokens + rotating refresh tokens).
-> No AI, integrations or product features yet.
+> **Status: Phase 4 — projects, tasks & goals.** Monorepo, apps, shared
+> packages, local infrastructure, a migration-based PostgreSQL layer (TypeORM),
+> email/password authentication (JWT access tokens + rotating refresh tokens),
+> and the core per-user domain model: projects, tasks and goals (REST API).
+> No AI, integrations or UI for these yet.
 
 ## Stack
 
@@ -167,6 +168,7 @@ apps/api/src/
     migrations/           Migration files
   users/user.entity.ts    User entity (id, email, passwordHash, createdAt, updatedAt)
   auth/sessions/          RefreshSession entity (hashed refresh tokens)
+  projects/ tasks/ goals/ Domain modules (entity, DTOs, service, controller)
 ```
 
 ## Authentication
@@ -265,6 +267,84 @@ Rate limiting on login/register (needs a shared store such as Redis for
 multiple instances), periodic cleanup of expired `refresh_sessions` rows,
 cookie-based token transport for the web app, email verification, password
 reset, OAuth and 2FA.
+
+## Projects, tasks & goals
+
+Per-user domain records. Every endpoint requires
+`Authorization: Bearer <access token>` and only ever sees the caller's own
+records. After pulling this phase, run `pnpm db:migration:run`; no new
+environment variables are needed.
+
+### Model
+
+| Entity    | Fields                                                                                                                       | Enums                                                                                                    |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `Project` | `id`, `name` (≤200), `description?`, `status`, `createdAt`, `updatedAt`                                                      | status `ACTIVE` · `COMPLETED` · `ARCHIVED`                                                               |
+| `Task`    | `id`, `projectId?`, `title` (≤200), `description?`, `status`, `priority`, `dueAt?`, `completedAt?`, `createdAt`, `updatedAt` | status `TODO` · `IN_PROGRESS` · `COMPLETED` · `CANCELLED`; priority `LOW` · `MEDIUM` · `HIGH` · `URGENT` |
+| `Goal`    | `id`, `title` (≤200), `description?`, `status`, `targetDate?` (`YYYY-MM-DD`), `createdAt`, `updatedAt`                       | status `ACTIVE` · `COMPLETED` · `PAUSED` · `ARCHIVED`                                                    |
+
+Defaults: project/goal `ACTIVE`, task `TODO` + `MEDIUM`. Descriptions ≤ 10,000
+characters. Timestamps are ISO 8601 in UTC; `dueAt` must include a timezone
+(`Z` or `±hh:mm`). Enums and request/response types are exported from
+`@nexus/types`.
+
+### Endpoints
+
+Each resource exposes the same five routes:
+
+| Method & path                | Success                     | Notes                                                    |
+| ---------------------------- | --------------------------- | -------------------------------------------------------- |
+| `POST /api/{resource}`       | **201** created record      |                                                          |
+| `GET /api/{resource}`        | **200** array, newest first | Filters below; unknown params → 400                      |
+| `GET /api/{resource}/:id`    | **200** record              | 404 if missing _or not yours_                            |
+| `PATCH /api/{resource}/:id`  | **200** updated record      | Omitted fields unchanged; `null` clears a nullable field |
+| `DELETE /api/{resource}/:id` | **204**                     | 404 if missing _or not yours_                            |
+
+`{resource}` is `projects`, `tasks` or `goals`. Filters (combinable):
+
+- `GET /api/projects?status=ACTIVE`
+- `GET /api/tasks?status=TODO&priority=HIGH&projectId=<uuid>`
+- `GET /api/goals?status=PAUSED`
+
+Errors: **400** invalid body/query/UUID (including unknown fields such as
+`ownerId` or `completedAt`), **401** missing/invalid token, **404** not found.
+
+### Rules
+
+- **Ownership** comes from the access token only — `ownerId` is never
+  accepted from the client. Another user's record returns the same 404 as a
+  missing one, so its existence is never revealed.
+- **Task → project**: `projectId` must be one of _your_ projects (else 404
+  `Project not found.`). The database enforces this too, with a composite
+  foreign key `(project_id, owner_id) → projects (id, owner_id)`.
+- **`completedAt` is server-managed**: set when a task becomes `COMPLETED`,
+  kept while it stays completed, cleared when it moves to any other status.
+  A database CHECK keeps the two consistent.
+- **Deletes**: deleting a project keeps its tasks and sets their `projectId` to
+  `null`. Deleting a user deletes their projects, tasks and goals.
+
+### Examples
+
+```bash
+API=http://localhost:4000/api
+AUTH="Authorization: Bearer $ACCESS_TOKEN"
+
+curl -s -X POST $API/projects -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"name":"Website relaunch","description":"Q4 refresh"}'
+# → 201 {"id":"…","name":"Website relaunch","description":"Q4 refresh",
+#        "status":"ACTIVE","createdAt":"…","updatedAt":"…"}
+
+curl -s -X POST $API/tasks -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"title":"Draft copy","projectId":"<project id>","priority":"HIGH","dueAt":"2026-11-01T17:00:00Z"}'
+
+curl -s -X PATCH $API/tasks/<task id> -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"status":"COMPLETED"}'          # → completedAt is set by the server
+
+curl -s "$API/tasks?status=TODO&priority=HIGH" -H "$AUTH"
+
+curl -s -X POST $API/goals -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"title":"Run a half marathon","targetDate":"2027-04-18"}'
+```
 
 ## Shared packages
 
