@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { DocumentAnalysisModule } from './ai/document-analysis/document-analysis.module';
 import { AuthModule } from './auth/auth.module';
 import { validateEnv } from './config/env';
+import { ContextModule } from './context/context.module';
 import { DatabaseModule } from './database/database.module';
 import { DocumentsModule } from './documents/documents.module';
 import { GoalsModule } from './goals/goals.module';
@@ -27,6 +28,7 @@ import { TasksModule } from './tasks/tasks.module';
     GoalsModule,
     DocumentsModule,
     DocumentAnalysisModule,
+    ContextModule,
   ],
 })
 export class AppModule {}
