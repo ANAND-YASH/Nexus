@@ -1,6 +1,7 @@
 /**
  * End-to-end tests against a real PostgreSQL.
  * Requires `pnpm docker:up` and `pnpm db:migration:run` beforehand.
+ * Health endpoints must stay public even though a global auth guard exists.
  */
 import { type INestApplication } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
@@ -9,6 +10,7 @@ import request from 'supertest';
 import { type App } from 'supertest/types';
 import { DataSource, QueryFailedError } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/app.setup';
 import { User } from '../src/users/user.entity';
 
 describe('API (e2e)', () => {
@@ -21,7 +23,7 @@ describe('API (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
+    configureApp(app);
     await app.init();
     dataSource = app.get(DataSource);
   });
@@ -72,7 +74,10 @@ describe('API (e2e)', () => {
       try {
         const users = runner.manager.getRepository(User);
         const created = await users.save(
-          users.create({ email: '  E2E.Test@Example.com ' }),
+          users.create({
+            email: '  E2E.Test@Example.com ',
+            passwordHash: 'not-a-real-hash',
+          }),
         );
 
         expect(created.id).toMatch(/^[0-9a-f-]{36}$/);
@@ -81,7 +86,12 @@ describe('API (e2e)', () => {
           users.findOneBy({ email: 'E2E.TEST@example.com' }),
         ).resolves.toMatchObject({ id: created.id });
         await expect(
-          users.save(users.create({ email: 'e2e.test@EXAMPLE.com' })),
+          users.save(
+            users.create({
+              email: 'e2e.test@EXAMPLE.com',
+              passwordHash: 'not-a-real-hash',
+            }),
+          ),
         ).rejects.toBeInstanceOf(QueryFailedError);
       } finally {
         await runner.rollbackTransaction();
