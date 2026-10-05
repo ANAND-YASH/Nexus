@@ -37,6 +37,18 @@ export class User {
   })
   email: string;
 
+  /**
+   * argon2id hash (PHC string). `select: false` keeps it out of every query
+   * unless explicitly requested, so it can't leak through a generic find.
+   */
+  @Column({
+    name: 'password_hash',
+    type: 'varchar',
+    length: 255,
+    select: false,
+  })
+  passwordHash: string;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

@@ -1,8 +1,11 @@
 import { Controller, Get, Res } from '@nestjs/common';
 import type { HealthResponse, LivenessResponse } from '@nexus/types';
 import type { Response } from 'express';
+import { Public } from '../auth/decorators/public.decorator';
 import { HealthService } from './health.service';
 
+// Probes must work without credentials.
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(private readonly health: HealthService) {}

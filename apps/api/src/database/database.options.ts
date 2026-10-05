@@ -1,19 +1,11 @@
 import { extname, join } from 'node:path';
 import type { DataSourceOptions } from 'typeorm';
-import type { Env } from '../config/env';
+import { RefreshSession } from '../auth/sessions/refresh-session.entity';
+import type { DatabaseEnv } from '../config/env';
 import { User } from '../users/user.entity';
 
-export type DatabaseEnv = Pick<
-  Env,
-  | 'DATABASE_HOST'
-  | 'DATABASE_PORT'
-  | 'DATABASE_USER'
-  | 'DATABASE_PASSWORD'
-  | 'DATABASE_NAME'
->;
-
 /** Every entity the application maps. Register new entities here. */
-export const entities = [User];
+export const entities = [User, RefreshSession];
 
 /**
  * Single source of truth for the database connection, shared by the Nest

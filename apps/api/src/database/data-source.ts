@@ -6,7 +6,7 @@ import 'reflect-metadata';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DataSource } from 'typeorm';
-import { validateEnv } from '../config/env';
+import { validateDatabaseEnv } from '../config/env';
 import { buildDataSourceOptions } from './database.options';
 
 // Same precedence as ConfigModule: app-local .env, then the monorepo root.
@@ -16,4 +16,6 @@ for (const file of ['.env', '../../.env']) {
   if (existsSync(path)) process.loadEnvFile(path);
 }
 
-export default new DataSource(buildDataSourceOptions(validateEnv(process.env)));
+export default new DataSource(
+  buildDataSourceOptions(validateDatabaseEnv(process.env)),
+);

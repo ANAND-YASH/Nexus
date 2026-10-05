@@ -4,9 +4,10 @@
 goals, documents, calendar, email, GitHub activity and other sources into a
 unified context layer, then helps turn that information into action.
 
-> **Status: Phase 2 — database foundation.** Monorepo, apps, shared packages,
-> local infrastructure, and a migration-based PostgreSQL layer (TypeORM) with a
-> minimal `User` entity. No auth, AI or product features yet.
+> **Status: Phase 3 — authentication.** Monorepo, apps, shared packages,
+> local infrastructure, a migration-based PostgreSQL layer (TypeORM), and
+> email/password authentication (JWT access tokens + rotating refresh tokens).
+> No AI, integrations or product features yet.
 
 ## Stack
 
@@ -42,7 +43,7 @@ docker/
 ## Getting started
 
 ```bash
-cp .env.example .env      # set DATABASE_PASSWORD (and ports, if needed); never commit .env
+cp .env.example .env      # set DATABASE_PASSWORD and both JWT_* secrets; never commit .env
 pnpm install
 pnpm docker:up            # start PostgreSQL + Redis
 pnpm db:migration:run     # create the schema
@@ -164,8 +165,106 @@ apps/api/src/
     database.module.ts    TypeOrmModule wiring (reads validated config)
     data-source.ts        DataSource for the TypeORM CLI
     migrations/           Migration files
-  users/user.entity.ts    User entity (id, email, createdAt, updatedAt)
+  users/user.entity.ts    User entity (id, email, passwordHash, createdAt, updatedAt)
+  auth/sessions/          RefreshSession entity (hashed refresh tokens)
 ```
+
+## Authentication
+
+Email/password accounts with short-lived JWT **access tokens** and long-lived,
+single-use **refresh tokens**. No auth UI, OAuth, email verification, password
+reset or 2FA yet.
+
+### Required environment variables
+
+| Variable                 | Example | Notes                                              |
+| ------------------------ | ------- | -------------------------------------------------- |
+| `JWT_ACCESS_SECRET`      | —       | ≥ 32 chars. `openssl rand -base64 48`              |
+| `JWT_REFRESH_SECRET`     | —       | ≥ 32 chars, **must differ** from the access secret |
+| `JWT_ACCESS_EXPIRES_IN`  | `15m`   | Seconds or `s`/`m`/`h`/`d`. Keep it short          |
+| `JWT_REFRESH_EXPIRES_IN` | `7d`    | Must be longer than the access lifetime            |
+
+The API refuses to start if any is missing or invalid. The migration CLI only
+needs the `DATABASE_*` variables.
+
+### How it works
+
+- **Passwords** are hashed with **argon2id** (19 MiB, 2 iterations — OWASP
+  baseline) and stored as `users.password_hash`. The column is excluded from
+  queries by default and never appears in responses or logs.
+- **Access token**: HS256 JWT with only `sub` (user id), `iat`, `exp`, `iss`,
+  `aud`. Sent as `Authorization: Bearer <token>`. Stateless — it stays valid
+  until it expires (there is no blacklist), which is why it is short-lived.
+- **Refresh token**: HS256 JWT signed with a _separate_ secret and audience,
+  carrying `sub` and `sid` (its session id). The database stores only its
+  **SHA-256 hash** in `refresh_sessions`, never the token itself.
+  - **Rotation**: every `POST /auth/refresh` revokes the presented session and
+    issues a new access + refresh pair. Each refresh token works **once**.
+  - **Reuse detection**: presenting a revoked token — one already rotated or
+    logged out — is treated as theft: **all** of that user's sessions are
+    revoked and they must log in again. Clients must therefore always replace
+    their stored refresh token with the new one and never retry with the old.
+  - **Concurrency**: revocation is a single conditional `UPDATE`, so two
+    simultaneous refreshes with the same token can't both succeed.
+- **Transport**: tokens travel in JSON bodies/headers (no cookies yet). Clients
+  must store the refresh token securely; a browser client should move it to an
+  `httpOnly` cookie when the web auth UI is built.
+- **Secure by default**: a global guard requires a valid access token on every
+  route. Routes opt out explicitly with `@Public()` (currently: health
+  endpoints, register, login, refresh, logout). Read the caller with
+  `@CurrentUser()`.
+
+### Endpoints
+
+All under `http://localhost:4000/api`. Request bodies are validated; unknown
+fields are rejected with **400**.
+
+| Method & path         | Auth          | Success                                       | Errors                                         |
+| --------------------- | ------------- | --------------------------------------------- | ---------------------------------------------- |
+| `POST /auth/register` | —             | **201** `{ user, accessToken, refreshToken }` | 400 invalid input, 409 email taken             |
+| `POST /auth/login`    | —             | **200** `{ user, accessToken, refreshToken }` | 400 invalid input, 401 bad credentials         |
+| `POST /auth/refresh`  | refresh token | **200** `{ accessToken, refreshToken }`       | 400 missing token, 401 invalid/expired/revoked |
+| `POST /auth/logout`   | refresh token | **204** (idempotent)                          | 400 missing token, 401 invalid token           |
+| `GET /auth/me`        | access token  | **200** `{ id, email, createdAt, updatedAt }` | 401 missing/invalid/expired token              |
+
+Passwords must be 8–128 characters. Login failures always return the same
+`401 Invalid email or password.` whether or not the email exists.
+
+### Examples
+
+```bash
+API=http://localhost:4000/api
+
+# Register (201)
+curl -s -X POST $API/auth/register -H 'Content-Type: application/json' \
+  -d '{"email":"ada@example.com","password":"correct horse battery staple"}'
+# → {"user":{"id":"…","email":"ada@example.com","createdAt":"…","updatedAt":"…"},
+#    "accessToken":"eyJ…","refreshToken":"eyJ…"}
+
+# Login (200) — same response shape as register
+curl -s -X POST $API/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"ada@example.com","password":"correct horse battery staple"}'
+
+# Current user (200)
+curl -s $API/auth/me -H "Authorization: Bearer $ACCESS_TOKEN"
+# → {"id":"…","email":"ada@example.com","createdAt":"…","updatedAt":"…"}
+
+# Refresh (200) — the old refresh token is now dead; store the new pair
+curl -s -X POST $API/auth/refresh -H 'Content-Type: application/json' \
+  -d "{\"refreshToken\":\"$REFRESH_TOKEN\"}"
+# → {"accessToken":"eyJ…","refreshToken":"eyJ…"}
+
+# Logout (204) — revokes that refresh session
+curl -s -o /dev/null -w '%{http_code}\n' -X POST $API/auth/logout \
+  -H 'Content-Type: application/json' -d "{\"refreshToken\":\"$REFRESH_TOKEN\"}"
+```
+
+### Not yet implemented (later phases)
+
+Rate limiting on login/register (needs a shared store such as Redis for
+multiple instances), periodic cleanup of expired `refresh_sessions` rows,
+cookie-based token transport for the web app, email verification, password
+reset, OAuth and 2FA.
 
 ## Shared packages
 
