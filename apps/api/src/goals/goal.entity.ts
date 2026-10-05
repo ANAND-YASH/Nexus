@@ -7,11 +7,14 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  Unique,
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from '../users/user.entity';
 
 @Entity({ name: 'goals' })
+// Target of composite (goal_id, owner_id) keys, e.g. document_goals.
+@Unique('UQ_goals_id_owner_id', ['id', 'ownerId'])
 @Index('IDX_goals_owner_id_status', ['ownerId', 'status'])
 export class Goal {
   @PrimaryGeneratedColumn('uuid', { primaryKeyConstraintName: 'PK_goals' })

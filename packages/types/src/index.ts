@@ -1,4 +1,5 @@
 export * from './auth.js';
+export * from './documents.js';
 export * from './goals.js';
 export * from './health.js';
 export * from './projects.js';

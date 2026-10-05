@@ -8,12 +8,15 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  Unique,
   UpdateDateColumn,
 } from 'typeorm';
 import { Project } from '../projects/project.entity';
 import { User } from '../users/user.entity';
 
 @Entity({ name: 'tasks' })
+// Target of composite (task_id, owner_id) keys, e.g. document_tasks.
+@Unique('UQ_tasks_id_owner_id', ['id', 'ownerId'])
 @Index('IDX_tasks_owner_id_status', ['ownerId', 'status'])
 @Index('IDX_tasks_owner_id_due_at', ['ownerId', 'dueAt'])
 // completedAt is server-managed; the database refuses inconsistent rows too.

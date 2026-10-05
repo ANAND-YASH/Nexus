@@ -89,6 +89,13 @@ export class TasksService {
     if (!result.affected) throw taskNotFound();
   }
 
+  /** @throws NotFoundException unless the task exists and is the owner's. */
+  async assertOwned(ownerId: string, id: string): Promise<void> {
+    if (!(await this.tasks.exists({ where: { id, ownerId } }))) {
+      throw taskNotFound();
+    }
+  }
+
   private async findOwned(ownerId: string, id: string): Promise<Task> {
     const task = await this.tasks.findOne({ where: { id, ownerId } });
     if (!task) throw taskNotFound();
@@ -124,4 +131,4 @@ function toDate(value: string | null | undefined): Date | null {
   return value ? new Date(value) : null;
 }
 
-const taskNotFound = () => new NotFoundException('Task not found.');
+export const taskNotFound = () => new NotFoundException('Task not found.');

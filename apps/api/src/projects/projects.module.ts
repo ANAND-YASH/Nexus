@@ -8,7 +8,7 @@ import { ProjectsService } from './projects.service';
   imports: [TypeOrmModule.forFeature([Project])],
   controllers: [ProjectsController],
   providers: [ProjectsService],
-  // TasksService uses assertOwned() to validate task → project links.
+  // Tasks and documents use assertOwned() to validate links to projects.
   exports: [ProjectsService],
 })
 export class ProjectsModule {}

@@ -2,13 +2,27 @@ import { extname, join } from 'node:path';
 import type { DataSourceOptions } from 'typeorm';
 import { RefreshSession } from '../auth/sessions/refresh-session.entity';
 import type { DatabaseEnv } from '../config/env';
+import { Document } from '../documents/document.entity';
+import { DocumentGoalLink } from '../documents/links/document-goal-link.entity';
+import { DocumentProjectLink } from '../documents/links/document-project-link.entity';
+import { DocumentTaskLink } from '../documents/links/document-task-link.entity';
 import { Goal } from '../goals/goal.entity';
 import { Project } from '../projects/project.entity';
 import { Task } from '../tasks/task.entity';
 import { User } from '../users/user.entity';
 
 /** Every entity the application maps. Register new entities here. */
-export const entities = [User, RefreshSession, Project, Task, Goal];
+export const entities = [
+  User,
+  RefreshSession,
+  Project,
+  Task,
+  Goal,
+  Document,
+  DocumentProjectLink,
+  DocumentTaskLink,
+  DocumentGoalLink,
+];
 
 /**
  * Single source of truth for the database connection, shared by the Nest

@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { validateEnv } from './config/env';
 import { DatabaseModule } from './database/database.module';
+import { DocumentsModule } from './documents/documents.module';
 import { GoalsModule } from './goals/goals.module';
 import { HealthModule } from './health/health.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -23,6 +24,7 @@ import { TasksModule } from './tasks/tasks.module';
     ProjectsModule,
     TasksModule,
     GoalsModule,
+    DocumentsModule,
   ],
 })
 export class AppModule {}
