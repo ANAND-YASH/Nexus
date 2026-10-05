@@ -2,10 +2,13 @@ import { extname, join } from 'node:path';
 import type { DataSourceOptions } from 'typeorm';
 import { RefreshSession } from '../auth/sessions/refresh-session.entity';
 import type { DatabaseEnv } from '../config/env';
+import { Goal } from '../goals/goal.entity';
+import { Project } from '../projects/project.entity';
+import { Task } from '../tasks/task.entity';
 import { User } from '../users/user.entity';
 
 /** Every entity the application maps. Register new entities here. */
-export const entities = [User, RefreshSession];
+export const entities = [User, RefreshSession, Project, Task, Goal];
 
 /**
  * Single source of truth for the database connection, shared by the Nest
