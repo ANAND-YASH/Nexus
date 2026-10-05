@@ -8,5 +8,7 @@ import { GoalsService } from './goals.service';
   imports: [TypeOrmModule.forFeature([Goal])],
   controllers: [GoalsController],
   providers: [GoalsService],
+  // DocumentsModule uses assertOwned() to validate document → goal links.
+  exports: [GoalsService],
 })
 export class GoalsModule {}

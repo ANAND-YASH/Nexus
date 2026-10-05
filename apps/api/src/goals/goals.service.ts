@@ -61,6 +61,13 @@ export class GoalsService {
     if (!result.affected) throw goalNotFound();
   }
 
+  /** @throws NotFoundException unless the goal exists and is the owner's. */
+  async assertOwned(ownerId: string, id: string): Promise<void> {
+    if (!(await this.goals.exists({ where: { id, ownerId } }))) {
+      throw goalNotFound();
+    }
+  }
+
   private async findOwned(ownerId: string, id: string): Promise<Goal> {
     const goal = await this.goals.findOne({ where: { id, ownerId } });
     if (!goal) throw goalNotFound();
@@ -68,4 +75,4 @@ export class GoalsService {
   }
 }
 
-const goalNotFound = () => new NotFoundException('Goal not found.');
+export const goalNotFound = () => new NotFoundException('Goal not found.');

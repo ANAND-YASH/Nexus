@@ -3,7 +3,7 @@
  * and relationship behavior. Requires `pnpm docker:up` and
  * `pnpm db:migration:run` beforehand.
  *
- * Users are `e2e-<uuid>@nexus.test` and are deleted in afterAll; projects,
+ * Users are `e2e-<run>-<uuid>@nexus.test` and are deleted in afterAll; projects,
  * tasks, goals and sessions cascade with them.
  */
 import { randomUUID } from 'node:crypto';
@@ -20,8 +20,9 @@ import { type App } from 'supertest/types';
 import { DataSource, QueryFailedError } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/app.setup';
+import { e2eUsers } from './e2e-users';
 
-const E2E_EMAIL_PATTERN = 'e2e-%@nexus.test';
+const users = e2eUsers();
 
 interface Actor {
   id: string;
@@ -53,7 +54,7 @@ describe('Projects, tasks & goals (e2e)', () => {
     const res = await http()
       .post('/api/auth/register')
       .send({
-        email: `e2e-${randomUUID()}@nexus.test`,
+        email: users.newEmail(),
         password: 'correct horse battery staple',
       })
       .expect(201);
@@ -90,12 +91,7 @@ describe('Projects, tasks & goals (e2e)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .createQueryBuilder()
-      .delete()
-      .from('users')
-      .where('email LIKE :pattern', { pattern: E2E_EMAIL_PATTERN })
-      .execute();
+    await users.cleanup(db);
     await app.close();
   });
 

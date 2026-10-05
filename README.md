@@ -4,11 +4,12 @@
 goals, documents, calendar, email, GitHub activity and other sources into a
 unified context layer, then helps turn that information into action.
 
-> **Status: Phase 4 — projects, tasks & goals.** Monorepo, apps, shared
+> **Status: Phase 5 — documents & knowledge.** Monorepo, apps, shared
 > packages, local infrastructure, a migration-based PostgreSQL layer (TypeORM),
 > email/password authentication (JWT access tokens + rotating refresh tokens),
-> and the core per-user domain model: projects, tasks and goals (REST API).
-> No AI, integrations or UI for these yet.
+> the core per-user domain model (projects, tasks, goals), and a document
+> knowledge layer with relationships and PostgreSQL full-text search.
+> No AI, embeddings, integrations or UI for these yet.
 
 ## Stack
 
@@ -169,6 +170,7 @@ apps/api/src/
   users/user.entity.ts    User entity (id, email, passwordHash, createdAt, updatedAt)
   auth/sessions/          RefreshSession entity (hashed refresh tokens)
   projects/ tasks/ goals/ Domain modules (entity, DTOs, service, controller)
+  documents/              Documents, links to projects/tasks/goals, search
 ```
 
 ## Authentication
@@ -344,6 +346,88 @@ curl -s "$API/tasks?status=TODO&priority=HIGH" -H "$AUTH"
 
 curl -s -X POST $API/goals -H "$AUTH" -H 'Content-Type: application/json' \
   -d '{"title":"Run a half marathon","targetDate":"2027-04-18"}'
+```
+
+## Documents
+
+Text documents owned by a user — the knowledge layer later phases will build
+AI understanding and search on. Content is stored as text in PostgreSQL; there
+are no file uploads, object storage, embeddings or AI yet. After pulling this
+phase, run `pnpm db:migration:run`; no new environment variables are needed.
+
+### Model
+
+| Field           | Type / limits                                                                                                              |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `title`         | required, trimmed, ≤ 300 chars                                                                                             |
+| `content`       | required, not blank, ≤ 200,000 chars, stored verbatim                                                                      |
+| `mimeType`      | required `type/subtype` (no parameters), stored lowercase                                                                  |
+| `sourceType`    | required: `MANUAL` · `UPLOAD` · `IMPORT` · `URL`                                                                           |
+| `sourceUrl`     | optional `http(s)` URL ≤ 2048 chars; URLs with `user:pass@` are rejected                                                   |
+| `fileName`      | optional, ≤ 255 chars                                                                                                      |
+| `fileSizeBytes` | optional integer ≥ 0 (metadata only)                                                                                       |
+| `checksum`      | optional hex digest, 32–128 chars (e.g. SHA-256), stored lowercase. Metadata only — not computed or used for deduplication |
+
+`ownerId`, `id` and timestamps are never accepted from clients (400). JSON
+request bodies may be up to 1 MB (raised from Express's 100 kB default to fit
+the content limit).
+
+### Endpoints
+
+All require `Authorization: Bearer <access token>`. Another user's document
+(or project/task/goal) returns the same 404 as a missing one.
+
+| Method & path                                    | Success                                                                                                |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `POST /api/documents`                            | **201** document (with content)                                                                        |
+| `GET /api/documents`                             | **200** summaries (no `content`), newest first                                                         |
+| `GET /api/documents/:id`                         | **200** document + `projectIds`, `taskIds`, `goalIds`                                                  |
+| `PATCH /api/documents/:id`                       | **200** document. Omitted = unchanged; `null` clears `sourceUrl`/`fileName`/`fileSizeBytes`/`checksum` |
+| `DELETE /api/documents/:id`                      | **204**; its links are removed, linked records are kept                                                |
+| `POST /api/documents/:id/projects/:projectId`    | **204**, idempotent (linking twice keeps one link)                                                     |
+| `DELETE /api/documents/:id/projects/:projectId`  | **204**; 404 if not linked                                                                             |
+| `POST`/`DELETE /api/documents/:id/tasks/:taskId` | same as projects                                                                                       |
+| `POST`/`DELETE /api/documents/:id/goals/:goalId` | same as projects                                                                                       |
+
+Linking requires both the document and the target to be yours. The database
+enforces this as well: each `document_*` link row has composite foreign keys
+`(document_id, owner_id)` and `(target_id, owner_id)` sharing one `owner_id`.
+Deleting a project, task or goal removes its links but never the document.
+
+### Listing and search
+
+```
+GET /api/documents?sourceType=UPLOAD
+GET /api/documents?mimeType=application/pdf
+GET /api/documents?search=refresh tokens
+GET /api/documents?search="exact phrase" -excluded&sourceType=MANUAL
+```
+
+- Filters combine; results are always limited to the caller's documents.
+- `search` (≤ 200 chars) uses **PostgreSQL full-text search** over title +
+  content with the `english` configuration: case-insensitive, stemmed
+  (`authentication` matches `authenticating`), stop words ignored, web-search
+  syntax (`"phrases"`, `-exclude`, `or`). It is not substring matching
+  (`auth` does not match `authentication`). Input is only ever a bound query
+  parameter. A GIN expression index (`IDX_documents_search`) backs it.
+- Results are ordered newest first (not by relevance), and **lists are not
+  paginated yet** — pagination is required before production-scale use.
+
+### Examples
+
+```bash
+API=http://localhost:4000/api
+AUTH="Authorization: Bearer $ACCESS_TOKEN"
+
+curl -s -X POST $API/documents -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"title":"Auth design","content":"We rotate refresh tokens…","mimeType":"text/markdown","sourceType":"MANUAL"}'
+
+curl -s -o /dev/null -w '%{http_code}\n' -X POST "$API/documents/<doc id>/projects/<project id>" -H "$AUTH"   # 204
+
+curl -s "$API/documents/<doc id>" -H "$AUTH"
+# → {…, "content":"…", "projectIds":["<project id>"], "taskIds":[], "goalIds":[]}
+
+curl -s "$API/documents?search=refresh%20tokens" -H "$AUTH"
 ```
 
 ## Shared packages

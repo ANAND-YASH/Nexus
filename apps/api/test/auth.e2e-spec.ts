@@ -2,10 +2,9 @@
  * Authentication flow against a real PostgreSQL.
  * Requires `pnpm docker:up` and `pnpm db:migration:run` beforehand.
  *
- * Every user created here uses an `e2e-<uuid>@nexus.test` address and is
+ * Every user created here uses an `e2e-<run>-<uuid>@nexus.test` address and is
  * deleted in afterAll (sessions cascade), so the dev database stays clean.
  */
-import { randomUUID } from 'node:crypto';
 import { type INestApplication } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import type { AuthResponse, RefreshResponse, UserResponse } from '@nexus/types';
@@ -14,11 +13,12 @@ import { type App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/app.setup';
+import { e2eUsers } from './e2e-users';
 import { TokenService } from '../src/auth/token.service';
 
 const PASSWORD = 'correct horse battery staple';
-const E2E_EMAIL_PATTERN = 'e2e-%@nexus.test';
-const newEmail = () => `e2e-${randomUUID()}@nexus.test`;
+const users = e2eUsers();
+const newEmail = users.newEmail;
 
 describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
@@ -45,12 +45,7 @@ describe('Auth (e2e)', () => {
   });
 
   afterAll(async () => {
-    await dataSource
-      .createQueryBuilder()
-      .delete()
-      .from('users')
-      .where('email LIKE :pattern', { pattern: E2E_EMAIL_PATTERN })
-      .execute();
+    await users.cleanup(dataSource);
     await app.close();
   });
 
