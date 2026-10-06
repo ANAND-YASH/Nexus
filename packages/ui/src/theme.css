@@ -1,0 +1,198 @@
+/*
+ * NEXUS design tokens.
+ *
+ * Semantic colors live in CSS variables so one set of utilities
+ * (`bg-surface`, `text-fg-muted`, `border-border`, …) serves both themes.
+ * The active theme is `data-theme` on <html> (set before first paint by the
+ * web app); without it the OS preference applies.
+ *
+ * Import after Tailwind: `@import '@nexus/ui/theme.css';`
+ */
+
+/* Scan this package's components for class names. */
+@source './';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', sans-serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+
+  --shadow-xs: 0 1px 2px 0 oklch(0.2 0.01 270 / 0.05);
+  --shadow-card:
+    0 1px 2px 0 oklch(0.2 0.01 270 / 0.04),
+    0 1px 3px 0 oklch(0.2 0.01 270 / 0.04);
+  --shadow-overlay:
+    0 12px 32px -8px oklch(0.2 0.02 270 / 0.22),
+    0 4px 12px -4px oklch(0.2 0.02 270 / 0.12);
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-dialog-in: nx-dialog-in 160ms var(--ease-out-soft);
+  --animate-drawer-in: nx-drawer-in 220ms var(--ease-out-soft);
+
+  @keyframes nx-dialog-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.98);
+    }
+  }
+
+  @keyframes nx-drawer-in {
+    from {
+      transform: translateX(-100%);
+    }
+  }
+}
+
+@theme inline {
+  --color-canvas: var(--nx-canvas);
+  --color-surface: var(--nx-surface);
+  --color-surface-muted: var(--nx-surface-muted);
+  --color-surface-raised: var(--nx-surface-raised);
+  --color-border: var(--nx-border);
+  --color-border-strong: var(--nx-border-strong);
+  --color-fg: var(--nx-fg);
+  --color-fg-muted: var(--nx-fg-muted);
+  --color-fg-subtle: var(--nx-fg-subtle);
+  --color-accent: var(--nx-accent);
+  --color-accent-hover: var(--nx-accent-hover);
+  --color-accent-fg: var(--nx-accent-fg);
+  --color-accent-soft: var(--nx-accent-soft);
+  --color-accent-text: var(--nx-accent-text);
+  --color-success: var(--nx-success);
+  --color-success-soft: var(--nx-success-soft);
+  --color-warning: var(--nx-warning);
+  --color-warning-soft: var(--nx-warning-soft);
+  --color-danger: var(--nx-danger);
+  --color-danger-soft: var(--nx-danger-soft);
+  --color-ring: var(--nx-ring);
+  --color-scrim: var(--nx-scrim);
+}
+
+:root {
+  color-scheme: light;
+  --nx-canvas: oklch(0.982 0.002 270);
+  --nx-surface: oklch(1 0 0);
+  --nx-surface-muted: oklch(0.965 0.003 270);
+  --nx-surface-raised: oklch(1 0 0);
+  --nx-border: oklch(0.918 0.004 270);
+  --nx-border-strong: oklch(0.86 0.006 270);
+  --nx-fg: oklch(0.22 0.012 270);
+  --nx-fg-muted: oklch(0.46 0.013 270);
+  --nx-fg-subtle: oklch(0.55 0.012 270);
+  --nx-accent: oklch(0.51 0.2 277);
+  --nx-accent-hover: oklch(0.46 0.2 277);
+  --nx-accent-fg: oklch(0.99 0 0);
+  --nx-accent-soft: oklch(0.955 0.025 277);
+  --nx-accent-text: oklch(0.47 0.19 277);
+  --nx-success: oklch(0.5 0.12 155);
+  --nx-success-soft: oklch(0.96 0.035 155);
+  --nx-warning: oklch(0.53 0.12 65);
+  --nx-warning-soft: oklch(0.965 0.045 85);
+  --nx-danger: oklch(0.53 0.19 25);
+  --nx-danger-soft: oklch(0.962 0.025 25);
+  --nx-ring: oklch(0.51 0.2 277 / 0.55);
+  --nx-scrim: oklch(0.18 0.01 270 / 0.4);
+}
+
+/* Dark values, applied explicitly or (with no explicit choice) by the OS. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --nx-canvas: oklch(0.155 0.006 270);
+  --nx-surface: oklch(0.188 0.007 270);
+  --nx-surface-muted: oklch(0.225 0.008 270);
+  --nx-surface-raised: oklch(0.215 0.008 270);
+  --nx-border: oklch(0.27 0.008 270);
+  --nx-border-strong: oklch(0.35 0.01 270);
+  --nx-fg: oklch(0.95 0.004 270);
+  --nx-fg-muted: oklch(0.73 0.01 270);
+  --nx-fg-subtle: oklch(0.64 0.01 270);
+  --nx-accent: oklch(0.6 0.18 277);
+  --nx-accent-hover: oklch(0.66 0.17 277);
+  --nx-accent-fg: oklch(0.99 0 0);
+  --nx-accent-soft: oklch(0.27 0.06 277);
+  --nx-accent-text: oklch(0.79 0.11 277);
+  --nx-success: oklch(0.76 0.13 155);
+  --nx-success-soft: oklch(0.26 0.045 155);
+  --nx-warning: oklch(0.81 0.12 80);
+  --nx-warning-soft: oklch(0.27 0.045 75);
+  --nx-danger: oklch(0.73 0.16 25);
+  --nx-danger-soft: oklch(0.27 0.06 25);
+  --nx-ring: oklch(0.7 0.15 277 / 0.6);
+  --nx-scrim: oklch(0.05 0.005 270 / 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --nx-canvas: oklch(0.155 0.006 270);
+    --nx-surface: oklch(0.188 0.007 270);
+    --nx-surface-muted: oklch(0.225 0.008 270);
+    --nx-surface-raised: oklch(0.215 0.008 270);
+    --nx-border: oklch(0.27 0.008 270);
+    --nx-border-strong: oklch(0.35 0.01 270);
+    --nx-fg: oklch(0.95 0.004 270);
+    --nx-fg-muted: oklch(0.73 0.01 270);
+    --nx-fg-subtle: oklch(0.64 0.01 270);
+    --nx-accent: oklch(0.6 0.18 277);
+    --nx-accent-hover: oklch(0.66 0.17 277);
+    --nx-accent-fg: oklch(0.99 0 0);
+    --nx-accent-soft: oklch(0.27 0.06 277);
+    --nx-accent-text: oklch(0.79 0.11 277);
+    --nx-success: oklch(0.76 0.13 155);
+    --nx-success-soft: oklch(0.26 0.045 155);
+    --nx-warning: oklch(0.81 0.12 80);
+    --nx-warning-soft: oklch(0.27 0.045 75);
+    --nx-danger: oklch(0.73 0.16 25);
+    --nx-danger-soft: oklch(0.27 0.06 25);
+    --nx-ring: oklch(0.7 0.15 277 / 0.6);
+    --nx-scrim: oklch(0.05 0.005 270 / 0.6);
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--nx-canvas);
+    color: var(--nx-fg);
+    font-feature-settings:
+      'cv11' 1,
+      'ss01' 1;
+  }
+
+  ::selection {
+    background-color: var(--nx-accent-soft);
+    color: var(--nx-fg);
+  }
+
+  /* One focus treatment everywhere; components opt out only with care. */
+  :focus-visible {
+    outline: 2px solid var(--nx-ring);
+    outline-offset: 2px;
+  }
+
+  /* Freeze the page behind modal dialogs. */
+  html:has(dialog[open]:modal) {
+    overflow: hidden;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
