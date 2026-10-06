@@ -8,29 +8,19 @@ import type {
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { authedGet, authedRequest } from './authed';
-import { ApiError } from './client';
-
-/** The API only accepts UUID ids (anything else is a 400, not a 404). */
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function notFoundOn404(error: unknown): never {
-  // Missing and other users' projects are the same 404 on the API.
-  if (error instanceof ApiError && error.status === 404) notFound();
-  throw error;
-}
+import { isUuid, notFoundOn404 } from './ids';
+import { listTasksWhere } from './tasks';
 
 /** One of the caller's projects, or the not-found page. */
 export const getProject = cache((id: string): Promise<ProjectResponse> => {
-  if (!UUID.test(id)) notFound();
+  if (!isUuid(id)) notFound();
   return authedGet<ProjectResponse>(`/api/projects/${id}`).catch(notFoundOn404);
 });
 
 /** Tasks assigned to a project (the tasks API filters by `projectId`). */
-export const listProjectTasks = cache((projectId: string) =>
-  authedGet<TaskResponse[]>(
-    `/api/tasks?projectId=${encodeURIComponent(projectId)}`,
-  ),
-);
+export function listProjectTasks(projectId: string): Promise<TaskResponse[]> {
+  return listTasksWhere(null, projectId);
+}
 
 /**
  * The project's direct neighbours in the context graph: linked documents,

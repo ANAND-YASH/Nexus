@@ -1,109 +1,82 @@
-import type { TaskPriority, TaskResponse, TaskStatus } from '@nexus/types';
-import { Badge, cn } from '@nexus/ui';
-import { ClockIcon } from '@/components/icons';
+import type { TaskResponse } from '@nexus/types';
+import { cn } from '@nexus/ui';
+import Link from 'next/link';
 import { LocalDate } from '@/components/local-date';
+import { TASK_STATUS_META } from '@/lib/tasks/meta';
+import { isOpenTask } from '@/lib/tasks/order';
+import { DueLabel } from './due-label';
+import { PriorityIndicator } from './priority-indicator';
+import { TaskStatusToggle } from './task-status-toggle';
 
-const PRIORITY_BADGE: Partial<
-  Record<TaskPriority, { label: string; tone: 'warning' | 'danger' }>
-> = {
-  URGENT: { label: 'Urgent', tone: 'danger' },
-  HIGH: { label: 'High', tone: 'warning' },
-};
-
-const STATUS_LABEL: Record<TaskStatus, string> = {
-  TODO: 'To do',
-  IN_PROGRESS: 'In progress',
-  COMPLETED: 'Completed',
-  CANCELLED: 'Cancelled',
-};
-
-function StatusMark({ status }: { status: TaskStatus }) {
-  if (status === 'COMPLETED') {
+function Schedule({ task }: { task: TaskResponse }) {
+  if (task.status === 'COMPLETED' && task.completedAt) {
     return (
-      <span
-        aria-hidden
-        className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-success text-surface"
-      >
-        <svg viewBox="0 0 12 12" className="size-2.5" fill="none">
-          <path
-            d="m3 6.2 2 1.9L9 4"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+      <span className="text-xs whitespace-nowrap text-fg-subtle tabular-nums">
+        Done <LocalDate value={task.completedAt} />
       </span>
     );
   }
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        'size-3.5 shrink-0 rounded-full border-2',
-        status === 'IN_PROGRESS' &&
-          'border-accent bg-[conic-gradient(var(--color-accent)_50%,transparent_0)]',
-        status === 'TODO' && 'border-border-strong',
-        status === 'CANCELLED' && 'border-dashed border-border-strong',
-      )}
-    />
-  );
+  return <DueLabel dueAt={task.dueAt} open={isOpenTask(task)} />;
 }
 
-/** One task, read-only. `detail` is the secondary line (e.g. project name). */
+/**
+ * One task in a list: complete/reopen toggle, title (links to the task),
+ * status, project, priority and due date. Used by the Tasks list, project
+ * pages and the dashboard so a task always looks the same.
+ */
 export function TaskRow({
   task,
-  overdue = false,
-  detail,
+  project,
 }: {
   task: TaskResponse;
-  overdue?: boolean;
-  detail?: string;
+  /** The task's project, when it should be shown (and linked). */
+  project?: { id: string; name: string } | null;
 }) {
-  const priority = PRIORITY_BADGE[task.priority];
-  const closed = task.status === 'COMPLETED' || task.status === 'CANCELLED';
+  const closed = !isOpenTask(task);
 
   return (
-    <li className="flex items-center gap-3 px-3 py-2.5">
-      <StatusMark status={task.status} />
+    <li className="group relative flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-surface-muted/70">
+      <TaskStatusToggle
+        task={task}
+        className="relative z-10 -my-0.5 shrink-0"
+      />
       <div className="min-w-0 flex-1">
-        <p
+        <Link
+          href={`/tasks/${task.id}`}
           className={cn(
-            'truncate text-[13px] font-medium',
+            'block truncate text-[13px] font-medium after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-ring',
             closed ? 'text-fg-muted' : 'text-fg',
             task.status === 'CANCELLED' && 'line-through',
           )}
         >
           {task.title}
-        </p>
-        <p className="truncate text-xs text-fg-subtle">
-          {STATUS_LABEL[task.status]}
-          {detail && ` · ${detail}`}
-        </p>
-      </div>
-      {!closed && (
-        <div className="flex shrink-0 items-center gap-1.5">
-          {priority && <Badge tone={priority.tone}>{priority.label}</Badge>}
-          {task.dueAt &&
-            (overdue ? (
-              <Badge tone="danger" dot>
-                Overdue
-              </Badge>
-            ) : (
-              <span className="hidden items-center gap-1 text-xs text-fg-muted tabular-nums sm:inline-flex">
-                <ClockIcon width={13} height={13} className="text-fg-subtle" />
-                <span className="sr-only">Due</span>
-                <LocalDate value={task.dueAt} />
-              </span>
-            ))}
+        </Link>
+        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg-subtle">
+          <span>{TASK_STATUS_META[task.status].label}</span>
+          {project && (
+            <>
+              <span aria-hidden>·</span>
+              <Link
+                href={`/projects/${project.id}`}
+                className="relative z-10 max-w-48 truncate rounded-sm hover:text-fg hover:underline"
+              >
+                {project.name}
+              </Link>
+            </>
+          )}
+          {/* Narrow screens: priority and schedule move under the title. */}
+          <span className="flex items-center gap-2 sm:hidden">
+            <PriorityIndicator priority={task.priority} />
+            <Schedule task={task} />
+          </span>
         </div>
-      )}
-      {task.status === 'COMPLETED' && task.completedAt && (
-        <span className="hidden shrink-0 text-xs text-fg-subtle tabular-nums sm:inline">
-          <span className="sr-only">Completed </span>
-          <LocalDate value={task.completedAt} />
+      </div>
+      <div className="hidden shrink-0 items-center gap-4 pt-0.5 sm:flex">
+        <PriorityIndicator priority={task.priority} className="w-16" />
+        <span className="flex w-36 justify-end">
+          <Schedule task={task} />
         </span>
-      )}
+      </div>
     </li>
   );
 }

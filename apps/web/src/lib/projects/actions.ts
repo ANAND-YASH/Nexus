@@ -2,8 +2,8 @@
 
 import type { ProjectStatus } from '@nexus/types';
 import { refresh } from 'next/cache';
-import { redirect, unstable_rethrow } from 'next/navigation';
-import { ApiError } from '../api/client';
+import { redirect } from 'next/navigation';
+import { describeFailure } from '../actions/failure';
 import { createProject, deleteProject, updateProject } from '../api/projects';
 import {
   readProjectForm,
@@ -24,19 +24,7 @@ export interface ProjectActionResult {
   error?: string;
 }
 
-/** Maps a failure to a message. Next.js control flow (redirects) passes through. */
-function describeFailure(error: unknown): string {
-  unstable_rethrow(error);
-  if (!(error instanceof ApiError) || error.unreachable) {
-    return "We couldn't reach NEXUS. Check your connection and try again.";
-  }
-  if (error.status === 404) {
-    return 'This project no longer exists. It may have been deleted.';
-  }
-  // Validation messages from the API are written for people.
-  if (error.status === 400) return error.message;
-  return 'Something went wrong on our side. Please try again.';
-}
+const NOT_FOUND = 'This project no longer exists. It may have been deleted.';
 
 export async function createProjectAction(
   state: ProjectFormState,
@@ -51,7 +39,11 @@ export async function createProjectAction(
     refresh();
     return { savedCount: (state.savedCount ?? 0) + 1, projectId: project.id };
   } catch (error) {
-    return { ...state, error: describeFailure(error), fieldErrors: undefined };
+    return {
+      ...state,
+      error: describeFailure(error, NOT_FOUND),
+      fieldErrors: undefined,
+    };
   }
 }
 
@@ -69,7 +61,11 @@ export async function updateProjectAction(
     refresh();
     return { savedCount: (state.savedCount ?? 0) + 1, projectId: id };
   } catch (error) {
-    return { ...state, error: describeFailure(error), fieldErrors: undefined };
+    return {
+      ...state,
+      error: describeFailure(error, NOT_FOUND),
+      fieldErrors: undefined,
+    };
   }
 }
 
@@ -81,7 +77,7 @@ export async function setProjectStatusAction(
   try {
     await updateProject(id, { status });
   } catch (error) {
-    return { error: describeFailure(error) };
+    return { error: describeFailure(error, NOT_FOUND) };
   }
   refresh();
   return {};
@@ -93,7 +89,7 @@ export async function deleteProjectAction(
   try {
     await deleteProject(id);
   } catch (error) {
-    return { error: describeFailure(error) };
+    return { error: describeFailure(error, NOT_FOUND) };
   }
   redirect('/projects');
 }

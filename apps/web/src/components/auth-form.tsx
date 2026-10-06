@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Card, Spinner, TextField } from '@nexus/ui';
+import { Alert, Button, Card, Spinner, TextField } from '@nexus/ui';
 import Link from 'next/link';
 import { useActionState } from 'react';
 import { AlertIcon } from '@/components/icons';
@@ -52,15 +52,7 @@ export function AuthForm({
 
         <form action={action} className="mt-6 grid gap-4" noValidate>
           {next && <input type="hidden" name="next" value={next} />}
-          {state.error && (
-            <div
-              role="alert"
-              className="flex gap-2.5 rounded-lg bg-danger-soft px-3 py-2.5 text-[13px] text-danger ring-1 ring-danger/15 ring-inset"
-            >
-              <AlertIcon width={16} height={16} className="mt-px shrink-0" />
-              <p>{state.error}</p>
-            </div>
-          )}
+          {state.error && <Alert icon={<AlertIcon />}>{state.error}</Alert>}
           <TextField
             id="email"
             name="email"

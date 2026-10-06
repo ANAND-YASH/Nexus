@@ -3,7 +3,7 @@ import { TasksIcon } from '@/components/icons';
 import { PanelList } from '@/components/section-panel';
 import { TaskRow } from '@/components/tasks/task-row';
 import { listProjects, listTasks } from '@/lib/api/workspace';
-import { upNext } from '@/lib/dashboard';
+import { upNext } from '@/lib/tasks/order';
 
 const LIMIT = 6;
 
@@ -25,15 +25,14 @@ export async function UpNext() {
     );
   }
 
-  const projectNames = new Map(projects.map((p) => [p.id, p.name]));
+  const projectsById = new Map(projects.map((p) => [p.id, p]));
   return (
     <PanelList>
-      {next.map(({ task, overdue }) => (
+      {next.map(({ task }) => (
         <TaskRow
           key={task.id}
           task={task}
-          overdue={overdue}
-          detail={task.projectId ? projectNames.get(task.projectId) : undefined}
+          project={task.projectId ? projectsById.get(task.projectId) : null}
         />
       ))}
     </PanelList>

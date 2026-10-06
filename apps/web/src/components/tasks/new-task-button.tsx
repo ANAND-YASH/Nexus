@@ -2,31 +2,39 @@
 
 import { Button, Dialog, type ButtonProps } from '@nexus/ui';
 import { useCallback, useState } from 'react';
-import { createProjectAction } from '@/lib/projects/actions';
 import { PlusIcon } from '@/components/icons';
-import { ProjectForm } from './project-form';
+import { createTaskAction } from '@/lib/tasks/actions';
+import type { ProjectOption } from '@/lib/tasks/project-options';
+import { EMPTY_TASK, TaskForm } from './task-form';
 
-/** "New project" trigger + dialog. The list refreshes in place on success. */
-export function NewProjectButton({
+/** "New task" trigger + dialog. The current page refreshes on success. */
+export function NewTaskButton({
+  projects,
+  defaultProjectId = null,
   variant = 'primary',
+  size,
 }: {
+  projects: ProjectOption[];
+  /** Pre-selects a project (e.g. when adding from a project page). */
+  defaultProjectId?: string | null;
   variant?: ButtonProps['variant'];
+  size?: ButtonProps['size'];
 }) {
   const [open, setOpen] = useState(false);
-  // A fresh form (and action state) every time the dialog opens.
   const [session, setSession] = useState(0);
   const [announcement, setAnnouncement] = useState('');
 
   const close = useCallback(() => setOpen(false), []);
   const saved = useCallback(() => {
     setOpen(false);
-    setAnnouncement('Project created.');
+    setAnnouncement('Task created.');
   }, []);
 
   return (
     <>
       <Button
         variant={variant}
+        size={size}
         aria-haspopup="dialog"
         onClick={() => {
           setSession((value) => value + 1);
@@ -35,14 +43,16 @@ export function NewProjectButton({
         }}
       >
         <PlusIcon />
-        New project
+        New task
       </Button>
-      <Dialog open={open} onClose={close} title="New project">
+      <Dialog open={open} onClose={close} title="New task" size="lg">
         {open && (
-          <ProjectForm
+          <TaskForm
             key={session}
-            action={createProjectAction}
-            submitLabel="Create project"
+            action={createTaskAction}
+            initial={{ ...EMPTY_TASK, projectId: defaultProjectId }}
+            projects={projects}
+            submitLabel="Create task"
             pendingLabel="Creating…"
             onSaved={saved}
             onCancel={close}
