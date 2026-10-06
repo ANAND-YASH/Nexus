@@ -4,9 +4,12 @@
   "private": true,
   "description": "Shared React UI components for NEXUS (consumed as source via Next.js transpilePackages)",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css"
+  ],
   "exports": {
     ".": "./src/index.ts",
+    "./theme.css": "./src/theme.css",
     "./*": "./src/*.tsx"
   },
   "scripts": {
