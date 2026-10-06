@@ -100,7 +100,7 @@ export async function DashboardStats() {
         label="Active goals"
         value={countBy(goals, (goal) => goal.status === 'ACTIVE')}
         icon={GoalsIcon}
-        detail={`${completedGoals} completed · ${pausedGoals} paused`}
+        detail={`${completedGoals} achieved · ${pausedGoals} paused`}
       />
       <StatCard
         href="/knowledge"

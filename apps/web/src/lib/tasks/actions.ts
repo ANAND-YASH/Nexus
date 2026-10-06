@@ -4,19 +4,13 @@ import type { TaskPriority, TaskStatus } from '@nexus/types';
 import { refresh } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { describeFailure } from '../actions/failure';
+import { savedState, type FormActionState } from '../forms';
 import { ApiError } from '../api/client';
 import { createTask, deleteTask, updateTask } from '../api/tasks';
 import { TASK_PRIORITY_META, TASK_STATUS_META } from './meta';
 import { readTaskForm, validateTask, type TaskFieldErrors } from './validation';
 
-export interface TaskFormState {
-  /** Increments on each success so the form can react (close, reset). */
-  savedCount?: number;
-  /** Id of the task last saved. */
-  taskId?: string;
-  error?: string;
-  fieldErrors?: TaskFieldErrors;
-}
+export type TaskFormState = FormActionState<keyof TaskFieldErrors>;
 
 export interface TaskActionResult {
   error?: string;
@@ -53,7 +47,7 @@ export async function createTaskAction(
   try {
     const task = await createTask(result.input);
     refresh();
-    return { savedCount: (state.savedCount ?? 0) + 1, taskId: task.id };
+    return savedState(state, task.id);
   } catch (error) {
     return {
       ...state,
@@ -76,7 +70,7 @@ export async function updateTaskAction(
   try {
     await updateTask(id, result.input);
     refresh();
-    return { savedCount: (state.savedCount ?? 0) + 1, taskId: id };
+    return savedState(state, id);
   } catch (error) {
     return {
       ...state,

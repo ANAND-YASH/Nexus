@@ -1,6 +1,5 @@
 import type {
   DocumentSummaryResponse,
-  GoalResponse,
   ProjectResponse,
   TaskResponse,
 } from '@nexus/types';
@@ -50,35 +49,6 @@ export function activeProjectProgress(
     .map((project) => ({
       project,
       progress: taskProgress(grouped.get(project.id) ?? []),
-    }));
-}
-
-/** `YYYY-MM-DD` for today in UTC, comparable with goal target dates. */
-function todayUtc(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-export interface GoalView {
-  goal: GoalResponse;
-  pastTarget: boolean;
-}
-
-/** Active goals, nearest target date first; undated goals last. */
-export function activeGoals(goals: GoalResponse[], limit: number): GoalView[] {
-  const today = todayUtc();
-  return goals
-    .filter((goal) => goal.status === 'ACTIVE')
-    .sort((a, b) => {
-      if (a.targetDate && b.targetDate) {
-        return a.targetDate.localeCompare(b.targetDate);
-      }
-      if (a.targetDate || b.targetDate) return a.targetDate ? -1 : 1;
-      return Date.parse(b.createdAt) - Date.parse(a.createdAt);
-    })
-    .slice(0, limit)
-    .map((goal) => ({
-      goal,
-      pastTarget: goal.targetDate !== null && goal.targetDate < today,
     }));
 }
 

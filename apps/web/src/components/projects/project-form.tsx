@@ -9,7 +9,8 @@ import {
   TextAreaField,
   TextField,
 } from '@nexus/ui';
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { useActionState, useRef, useState } from 'react';
+import { useFormFeedback } from '@/components/forms/use-form-feedback';
 import { AlertIcon } from '@/components/icons';
 import type { ProjectFormState } from '@/lib/projects/actions';
 import {
@@ -26,6 +27,12 @@ export interface ProjectFormValues {
   description: string;
   status: ProjectStatus;
 }
+
+const FIELD_ORDER: (keyof ProjectFieldErrors)[] = [
+  'name',
+  'description',
+  'status',
+];
 
 const EMPTY: ProjectFormValues = {
   name: '',
@@ -56,49 +63,27 @@ export function ProjectForm({
   onCancel: () => void;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
-  const [clientErrors, setClientErrors] = useState<ProjectFieldErrors>({});
+  const formRef = useRef<HTMLFormElement>(null);
+  const { errors, report, clearError } = useFormFeedback({
+    state,
+    fieldOrder: FIELD_ORDER,
+    formRef,
+    onSaved,
+  });
   const [descriptionLength, setDescriptionLength] = useState(
     initial.description.length,
   );
-  const lastSaved = useRef(state.savedCount ?? 0);
-
-  // Each success bumps `savedCount`; react once per save.
-  useEffect(() => {
-    const saved = state.savedCount ?? 0;
-    if (saved > lastSaved.current && state.projectId) {
-      lastSaved.current = saved;
-      onSaved(state.projectId);
-    }
-  }, [state.savedCount, state.projectId, onSaved]);
-
-  const errors = { ...state.fieldErrors, ...clientErrors };
-  const clearError = (field: keyof ProjectFieldErrors) =>
-    setClientErrors((current) => {
-      if (!current[field]) return current;
-      const next = { ...current };
-      delete next[field];
-      return next;
-    });
 
   return (
     <form
+      ref={formRef}
       action={formAction}
       noValidate
       onSubmit={(event) => {
         const result = validateProject(
           readProjectForm(new FormData(event.currentTarget)),
         );
-        if (result.errors) {
-          event.preventDefault();
-          setClientErrors(result.errors);
-          // Move focus to the first invalid field.
-          const first = Object.keys(result.errors)[0];
-          event.currentTarget
-            .querySelector<HTMLElement>(`[name="${first}"]`)
-            ?.focus();
-        } else {
-          setClientErrors({});
-        }
+        if (!report(result.errors)) event.preventDefault();
       }}
       className="flex flex-col"
     >

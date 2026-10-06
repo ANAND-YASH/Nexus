@@ -4,6 +4,7 @@ import type { ProjectStatus } from '@nexus/types';
 import { refresh } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { describeFailure } from '../actions/failure';
+import { savedState, type FormActionState } from '../forms';
 import { createProject, deleteProject, updateProject } from '../api/projects';
 import {
   readProjectForm,
@@ -11,14 +12,7 @@ import {
   type ProjectFieldErrors,
 } from './validation';
 
-export interface ProjectFormState {
-  /** Increments on each success so the form can react (close, reset). */
-  savedCount?: number;
-  /** Id of the project last saved. */
-  projectId?: string;
-  error?: string;
-  fieldErrors?: ProjectFieldErrors;
-}
+export type ProjectFormState = FormActionState<keyof ProjectFieldErrors>;
 
 export interface ProjectActionResult {
   error?: string;
@@ -37,7 +31,7 @@ export async function createProjectAction(
   try {
     const project = await createProject(result.input);
     refresh();
-    return { savedCount: (state.savedCount ?? 0) + 1, projectId: project.id };
+    return savedState(state, project.id);
   } catch (error) {
     return {
       ...state,
@@ -59,7 +53,7 @@ export async function updateProjectAction(
   try {
     await updateProject(id, result.input);
     refresh();
-    return { savedCount: (state.savedCount ?? 0) + 1, projectId: id };
+    return savedState(state, id);
   } catch (error) {
     return {
       ...state,
