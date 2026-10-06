@@ -11,7 +11,7 @@ import { LocalDate } from '@/components/local-date';
 import { PanelList } from '@/components/section-panel';
 import { TaskRow } from '@/components/tasks/task-row';
 import { getProjectContext, listProjectTasks } from '@/lib/api/projects';
-import { isOverdue, upNext } from '@/lib/dashboard';
+import { upNext } from '@/lib/tasks/order';
 import { progressLabel, taskProgress } from '@/lib/projects/progress';
 
 const CLOSED_LIMIT = 10;
@@ -65,11 +65,11 @@ export async function ProjectTasks({ projectId }: { projectId: string }) {
         />
       </div>
       <PanelList>
-        {open.map(({ task, overdue }) => (
-          <TaskRow key={task.id} task={task} overdue={overdue} />
+        {open.map(({ task }) => (
+          <TaskRow key={task.id} task={task} />
         ))}
         {shownClosed.map((task) => (
-          <TaskRow key={task.id} task={task} overdue={isOverdue(task)} />
+          <TaskRow key={task.id} task={task} />
         ))}
       </PanelList>
       {closed.length > CLOSED_LIMIT && (

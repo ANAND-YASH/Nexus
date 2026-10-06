@@ -11,13 +11,15 @@ export interface DialogProps {
   hideTitle?: boolean;
   /** `center` for confirmations and forms; `start` slides in as a drawer. */
   placement?: 'center' | 'start';
+  /** Width of a centered dialog. */
+  size?: 'md' | 'lg';
   className?: string;
   children: ReactNode;
 }
 
 const placementClasses = {
   center:
-    'm-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-border open:animate-dialog-in',
+    'm-auto w-[calc(100%-2rem)] rounded-xl border border-border open:animate-dialog-in',
   start:
     'my-0 mr-auto ml-0 h-dvh max-h-dvh w-[min(20rem,calc(100%-3rem))] border-r border-border open:animate-drawer-in',
 } as const;
@@ -32,6 +34,7 @@ export function Dialog({
   title,
   hideTitle = false,
   placement = 'center',
+  size = 'md',
   className,
   children,
 }: DialogProps) {
@@ -59,6 +62,7 @@ export function Dialog({
       className={cn(
         'bg-surface-raised p-0 text-fg shadow-overlay backdrop:bg-scrim backdrop:backdrop-blur-[2px]',
         placementClasses[placement],
+        placement === 'center' && (size === 'lg' ? 'max-w-xl' : 'max-w-md'),
         className,
       )}
     >

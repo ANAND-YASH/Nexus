@@ -13,6 +13,7 @@ export function SectionPanel({
   title,
   description,
   href,
+  action,
   subject,
   rows = 4,
   className,
@@ -23,6 +24,8 @@ export function SectionPanel({
   description?: string;
   /** "View all" destination. */
   href?: string;
+  /** Extra header control, e.g. a create button. */
+  action?: ReactNode;
   /** Used in loading and error messages, e.g. "your tasks". */
   subject: string;
   /** Skeleton rows while loading. */
@@ -42,15 +45,20 @@ export function SectionPanel({
         titleId={titleId}
         description={description}
         action={
-          href && (
-            <Link
-              href={href}
-              className="inline-flex items-center gap-1 rounded-md text-[13px] font-medium text-fg-muted transition-colors hover:text-fg"
-            >
-              View all
-              <span className="sr-only"> {title.toLowerCase()}</span>
-              <ArrowRightIcon width={14} height={14} />
-            </Link>
+          (action || href) && (
+            <div className="flex items-center gap-3">
+              {action}
+              {href && (
+                <Link
+                  href={href}
+                  className="inline-flex items-center gap-1 rounded-md text-[13px] font-medium text-fg-muted transition-colors hover:text-fg"
+                >
+                  View all
+                  <span className="sr-only"> {title.toLowerCase()}</span>
+                  <ArrowRightIcon width={14} height={14} />
+                </Link>
+              )}
+            </div>
           )
         }
       />

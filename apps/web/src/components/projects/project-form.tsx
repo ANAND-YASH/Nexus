@@ -2,6 +2,7 @@
 
 import type { ProjectStatus } from '@nexus/types';
 import {
+  Alert,
   Button,
   SelectField,
   Spinner,
@@ -102,15 +103,7 @@ export function ProjectForm({
       className="flex flex-col"
     >
       <div className="grid gap-4 px-5 pt-4 pb-5">
-        {state.error && (
-          <div
-            role="alert"
-            className="flex gap-2.5 rounded-lg bg-danger-soft px-3 py-2.5 text-[13px] text-danger ring-1 ring-danger/15 ring-inset"
-          >
-            <AlertIcon width={16} height={16} className="mt-px shrink-0" />
-            <p>{state.error}</p>
-          </div>
-        )}
+        {state.error && <Alert icon={<AlertIcon />}>{state.error}</Alert>}
         <TextField
           id="project-name"
           name="name"

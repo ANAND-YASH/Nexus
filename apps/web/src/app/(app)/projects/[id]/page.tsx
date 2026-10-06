@@ -10,7 +10,10 @@ import {
 } from '@/components/projects/project-detail';
 import { ProjectStatusBadge } from '@/components/projects/project-status-badge';
 import { SectionPanel } from '@/components/section-panel';
+import { NewTaskButton } from '@/components/tasks/new-task-button';
 import { getProject } from '@/lib/api/projects';
+import { listProjects } from '@/lib/api/workspace';
+import { toProjectOptions } from '@/lib/tasks/project-options';
 
 export async function generateMetadata({
   params,
@@ -23,7 +26,10 @@ export default async function ProjectPage({
   params,
 }: PageProps<'/projects/[id]'>) {
   const { id } = await params;
-  const project = await getProject(id);
+  const [project, projects] = await Promise.all([
+    getProject(id),
+    listProjects(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -91,6 +97,15 @@ export default async function ProjectPage({
           id="project-tasks"
           title="Tasks"
           description="Assigned to this project"
+          href={`/tasks?status=all&project=${project.id}`}
+          action={
+            <NewTaskButton
+              projects={toProjectOptions(projects)}
+              defaultProjectId={project.id}
+              variant="secondary"
+              size="sm"
+            />
+          }
           subject="this project’s tasks"
           rows={5}
           className="lg:col-span-2"
