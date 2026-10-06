@@ -172,3 +172,24 @@ export const PlusIcon = (p: IconProps) => (
     <path d="M12 5v14M5 12h14" />
   </Icon>
 );
+
+export const FlagIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M5.5 21V4.5" />
+    <path d="M5.5 4.5h11l-2.2 4 2.2 4h-11" />
+  </Icon>
+);
+
+export const PauseIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M10 9v6M14 9v6" />
+  </Icon>
+);
+
+export const ArchiveIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3.5" y="4.5" width="17" height="4" rx="1" />
+    <path d="M5 8.5v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9M10 12.5h4" />
+  </Icon>
+);

@@ -4,22 +4,12 @@
  * helpers take the time zone explicitly (undefined = the runtime's own).
  */
 
+import { dayKey, daysBetweenKeys } from '../dates';
+
 export type DueState = 'overdue' | 'today' | 'soon' | 'later' | 'none';
 
 /** "Due soon" covers tomorrow through this many days ahead. */
 export const DUE_SOON_DAYS = 3;
-
-const DAY_MS = 86_400_000;
-
-/** `YYYY-MM-DD` of an instant in a time zone. */
-function dayKey(ms: number, timeZone?: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(ms);
-}
 
 /** Whole calendar days from `now` to `target` in a time zone. */
 export function calendarDaysBetween(
@@ -27,10 +17,7 @@ export function calendarDaysBetween(
   target: number,
   timeZone?: string,
 ): number {
-  return Math.round(
-    (Date.parse(dayKey(target, timeZone)) - Date.parse(dayKey(now, timeZone))) /
-      DAY_MS,
-  );
+  return daysBetweenKeys(dayKey(now, timeZone), dayKey(target, timeZone));
 }
 
 /** Urgency of an open task's due date. Closed tasks are never urgent. */

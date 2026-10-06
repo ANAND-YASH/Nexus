@@ -9,7 +9,8 @@ import {
   TextAreaField,
   TextField,
 } from '@nexus/ui';
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { useActionState, useRef, useState } from 'react';
+import { useFormFeedback } from '@/components/forms/use-form-feedback';
 import { AlertIcon } from '@/components/icons';
 import type { TaskFormState } from '@/lib/tasks/actions';
 import type { ProjectOption } from '@/lib/tasks/project-options';
@@ -86,34 +87,15 @@ export function TaskForm({
   onCancel: () => void;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
-  const [clientErrors, setClientErrors] = useState<TaskFieldErrors>({});
+  const formRef = useRef<HTMLFormElement>(null);
+  const { errors, report, clearError } = useFormFeedback({
+    state,
+    fieldOrder: FIELD_ORDER,
+    formRef,
+    onSaved,
+  });
   const [due] = useState(() => fromDueAt(initial.dueAt));
   const dueAtRef = useRef<HTMLInputElement>(null);
-  const lastSaved = useRef(state.savedCount ?? 0);
-
-  useEffect(() => {
-    const saved = state.savedCount ?? 0;
-    if (saved > lastSaved.current && state.taskId) {
-      lastSaved.current = saved;
-      onSaved(state.taskId);
-    }
-  }, [state.savedCount, state.taskId, onSaved]);
-
-  // Server errors arrive after a round trip: move focus to the first one.
-  const formRef = useRef<HTMLFormElement>(null);
-  useEffect(() => {
-    const first = FIELD_ORDER.find((field) => state.fieldErrors?.[field]);
-    if (first) focusField(formRef.current, first);
-  }, [state.fieldErrors]);
-
-  const errors = { ...state.fieldErrors, ...clientErrors };
-  const clearError = (field: keyof TaskFieldErrors) =>
-    setClientErrors((current) => {
-      if (!current[field]) return current;
-      const next = { ...current };
-      delete next[field];
-      return next;
-    });
 
   return (
     <form
@@ -130,14 +112,8 @@ export function TaskForm({
         if (dueAtRef.current) dueAtRef.current.value = dueAt;
         data.set('dueAt', dueAt);
 
-        const result = validateTask(readTaskForm(data));
-        if (result.errors) {
+        if (!report(validateTask(readTaskForm(data)).errors)) {
           event.preventDefault();
-          setClientErrors(result.errors);
-          const first = FIELD_ORDER.find((field) => result.errors[field]);
-          if (first) focusField(form, first);
-        } else {
-          setClientErrors({});
         }
       }}
       className="flex flex-col"
@@ -228,11 +204,4 @@ export function TaskForm({
       </div>
     </form>
   );
-}
-
-function focusField(
-  form: HTMLFormElement | null,
-  field: keyof TaskFieldErrors,
-) {
-  form?.querySelector<HTMLElement>(`[name="${field}"]`)?.focus();
 }
